@@ -1,0 +1,25 @@
+[tool.poetry]
+name = "rentverse-ai-service"
+version = "0.1.0"
+description = ""
+authors = ["aliepratama <aliepratama2@gmail.com>"]
+readme = "README.md"
+packages = [{include = "rentverse"}]
+
+[tool.poetry.dependencies]
+python = "^3.12"
+fastapi = "^0.116.1"
+uvicorn = {extras = ["standard"], version = "^0.35.0"}
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.group.dev.dependencies]
+black = "^25.1.0"
+pytest = "^8.4.1"
+
+[tool.poetry.scripts]
+dev = "rentverse.cli:dev"
+start = "rentverse.cli:start"
+
