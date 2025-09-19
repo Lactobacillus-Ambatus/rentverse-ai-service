@@ -193,6 +193,143 @@ class HealthResponse(BaseModel):
         }
 
 
+class ListingApprovalRequest(BaseModel):
+    """Schema for listing approval classification request."""
+
+    property_type: PropertyType = Field(..., description="Type of property")
+    bedrooms: int = Field(..., ge=0, le=10, description="Number of bedrooms")
+    bathrooms: int = Field(..., ge=1, le=10, description="Number of bathrooms")
+    area: float = Field(..., gt=0, le=10000, description="Area in square feet")
+    furnished: FurnishedType = Field(..., description="Furnished status")
+    location: str = Field(..., min_length=1, max_length=200, description="Property location")
+    asking_price: float = Field(..., gt=0, description="Asking price in RM")
+    property_age: Optional[int] = Field(None, ge=0, le=100, description="Property age in years")
+    parking_spaces: Optional[int] = Field(None, ge=0, le=10, description="Number of parking spaces")
+    floor_level: Optional[int] = Field(None, ge=1, le=100, description="Floor level")
+    facilities: Optional[List[str]] = Field(None, description="List of facilities/amenities")
+
+    @field_validator('area')
+    @classmethod
+    def validate_area(cls, v):
+        if v <= 0:
+            raise ValueError('Area must be positive')
+        return v
+
+    @field_validator('location')
+    @classmethod
+    def validate_location(cls, v):
+        if not v.strip():
+            raise ValueError('Location cannot be empty')
+        return v.strip()
+
+    @field_validator('asking_price')
+    @classmethod
+    def validate_asking_price(cls, v):
+        if v <= 0:
+            raise ValueError('Asking price must be positive')
+        return v
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "property_type": "Condominium",
+                "bedrooms": 3,
+                "bathrooms": 2,
+                "area": 1200,
+                "furnished": "Yes",
+                "location": "KLCC, Kuala Lumpur",
+                "asking_price": 4500.0,
+                "property_age": 5,
+                "parking_spaces": 2,
+                "floor_level": 15,
+                "facilities": ["Swimming Pool", "Gym", "Security"]
+            }
+        }
+
+
+class ListingApprovalResponse(BaseModel):
+    """Schema for listing approval classification response."""
+
+    approval_status: str = Field(..., description="Approval status: approved, rejected, needs_review")
+    confidence_score: float = Field(..., ge=0, le=1, description="Confidence score of classification")
+    predicted_price: float = Field(..., description="Model predicted price in RM")
+    asking_price: float = Field(..., description="Asking price in RM")
+    price_deviation: float = Field(..., description="Percentage deviation from predicted price")
+    approval_reasons: List[str] = Field(..., description="Reasons for approval/rejection")
+    recommendations: Optional[List[str]] = Field(None, description="Recommendations for improvement")
+    status: str = Field(default="success", description="Classification status")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "approval_status": "approved",
+                "confidence_score": 0.87,
+                "predicted_price": 4200.0,
+                "asking_price": 4500.0,
+                "price_deviation": 7.1,
+                "approval_reasons": ["Price within acceptable range", "Good location", "Adequate facilities"],
+                "recommendations": ["Consider slightly reducing price for faster rental"],
+                "status": "success"
+            }
+        }
+
+
+class PricePredictionRequest(BaseModel):
+    """Schema for simplified price prediction request."""
+
+    property_type: PropertyType = Field(..., description="Type of property")
+    bedrooms: int = Field(..., ge=0, le=10, description="Number of bedrooms")
+    bathrooms: int = Field(..., ge=1, le=10, description="Number of bathrooms")
+    area: float = Field(..., gt=0, le=10000, description="Area in square feet")
+    furnished: FurnishedType = Field(..., description="Furnished status")
+    location: str = Field(..., min_length=1, max_length=200, description="Property location")
+
+    @field_validator('area')
+    @classmethod
+    def validate_area(cls, v):
+        if v <= 0:
+            raise ValueError('Area must be positive')
+        return v
+
+    @field_validator('location')
+    @classmethod
+    def validate_location(cls, v):
+        if not v.strip():
+            raise ValueError('Location cannot be empty')
+        return v.strip()
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "property_type": "Condominium",
+                "bedrooms": 3,
+                "bathrooms": 2,
+                "area": 1200,
+                "furnished": "Yes",
+                "location": "KLCC, Kuala Lumpur"
+            }
+        }
+
+
+class PricePredictionResponse(BaseModel):
+    """Schema for simplified price prediction response."""
+
+    predicted_price: float = Field(..., description="Predicted price in RM")
+    price_range: dict = Field(..., description="Price range (min, max)")
+    currency: str = Field(default="RM", description="Currency")
+    status: str = Field(default="success", description="Prediction status")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "predicted_price": 4200.0,
+                "price_range": {"min": 3800.0, "max": 4600.0},
+                "currency": "RM",
+                "status": "success"
+            }
+        }
+
+
 class ErrorResponse(BaseModel):
     """Schema for error responses."""
 

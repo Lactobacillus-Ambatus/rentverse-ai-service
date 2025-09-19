@@ -8,7 +8,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from .api.routes import health, prediction
+from .api.routes import health, prediction, classification
 from .api.middleware import RequestLoggingMiddleware, ErrorHandlingMiddleware
 from .models.ml_models import get_model
 from .core.exceptions import ModelNotFoundError
@@ -64,10 +64,11 @@ app = FastAPI(
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure appropriately for production
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_origins=["*"],  # Allow all origins
+    allow_credentials=False,  # Must be False when allow_origins=["*"]
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 # Add custom middleware
@@ -77,6 +78,7 @@ app.add_middleware(ErrorHandlingMiddleware)
 # Include routers
 app.include_router(health.router, prefix="/api/v1")
 app.include_router(prediction.router, prefix="/api/v1")
+app.include_router(classification.router, prefix="/api/v1")
 
 
 @app.get("/", tags=["Root"])
@@ -88,8 +90,21 @@ async def root():
         "description": "AI-powered rent price prediction service",
         "docs": "/docs",
         "health": "/api/v1/health",
-        "predict": "/api/v1/predict"
+        "predict": "/api/v1/predict",
+        "classify": "/api/v1/classify",
+        "endpoints": {
+            "price_prediction": "/api/v1/classify/price",
+            "listing_approval": "/api/v1/classify/approval",
+            "single_prediction": "/api/v1/predict/single",
+            "batch_prediction": "/api/v1/predict/batch"
+        }
     }
+
+
+@app.options("/{path:path}")
+async def options_handler(path: str):
+    """Handle OPTIONS requests for CORS preflight."""
+    return {"message": "OK"}
 
 
 @app.exception_handler(ModelNotFoundError)

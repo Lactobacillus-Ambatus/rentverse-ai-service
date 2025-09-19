@@ -52,6 +52,11 @@ class PropertyPricePredictionModel:
 
         self._load_pipeline()
 
+    @property
+    def model_version(self) -> str:
+        """Get the model version."""
+        return self.model_name or "Unknown"
+
     def _load_pipeline(self) -> None:
         """Load the pipeline from deployment pickle files."""
         try:
@@ -392,6 +397,101 @@ class PropertyPricePredictionModel:
                 'message': f'Health check failed: {str(e)}',
                 'timestamp': datetime.now().isoformat()
             }
+
+    def classify_listing_approval(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Classify if a listing should be approved based on price prediction and other factors.
+        
+        Args:
+            data: Dictionary containing property details and asking price
+        
+        Returns:
+            Dictionary with approval classification results
+        """
+        if not self.is_loaded or not self.pipeline_components:
+            raise PredictionError(MODEL_NOT_LOADED_MSG)
+
+        try:
+            # Get predicted price first
+            predicted_price = self.predict(data)
+            asking_price = data.get('asking_price', 0)
+            
+            if asking_price <= 0:
+                raise ValueError("Asking price must be provided and positive")
+            
+            # Calculate price deviation
+            price_deviation = ((asking_price - predicted_price) / predicted_price) * 100
+            
+            # Classification logic based on price deviation and other factors
+            approval_reasons = []
+            recommendations = []
+            
+            # Price-based classification
+            if abs(price_deviation) <= 15:  # Within 15% of predicted price
+                price_status = "acceptable"
+                approval_reasons.append("Price within acceptable range")
+            elif price_deviation > 15:
+                price_status = "overpriced"
+                recommendations.append(f"Consider reducing price by {price_deviation - 15:.1f}% for better market fit")
+            else:  # price_deviation < -15
+                price_status = "underpriced"
+                approval_reasons.append("Competitively priced")
+                recommendations.append("Price is very competitive, consider slight increase if demand is high")
+            
+            # Property quality factors
+            bedrooms = data.get('bedrooms', 0)
+            bathrooms = data.get('bathrooms', 0)
+            area = data.get('area', 0)
+            
+            # Check property specifications
+            if bedrooms >= 1 and bathrooms >= 1 and area >= 300:
+                approval_reasons.append("Adequate property specifications")
+            else:
+                recommendations.append("Verify property specifications meet minimum standards")
+            
+            # Location assessment (basic)
+            location = data.get('location', '').lower()
+            premium_areas = ['klcc', 'mont kiara', 'bangsar', 'damansara', 'shah alam', 'petaling jaya']
+            if any(area in location for area in premium_areas):
+                approval_reasons.append("Good location")
+            
+            # Facilities assessment
+            facilities = data.get('facilities', [])
+            if facilities and len(facilities) >= 2:
+                approval_reasons.append("Adequate facilities")
+            elif not facilities:
+                recommendations.append("Consider highlighting available facilities")
+            
+            # Final approval decision
+            if price_status == "acceptable" and len(approval_reasons) >= 2:
+                approval_status = "approved"
+                confidence_score = min(0.9, 0.6 + (len(approval_reasons) * 0.1))
+            elif price_status == "overpriced" and price_deviation > 30:
+                approval_status = "rejected"
+                confidence_score = min(0.85, 0.5 + (abs(price_deviation) / 100))
+                approval_reasons = ["Price significantly above market rate"]
+                recommendations.append("Adjust pricing to market standards")
+            else:
+                approval_status = "needs_review"
+                confidence_score = 0.7
+                if not approval_reasons:
+                    approval_reasons.append("Requires manual review")
+                recommendations.append("Manual review recommended for final approval")
+            
+            return {
+                "approval_status": approval_status,
+                "confidence_score": round(confidence_score, 2),
+                "predicted_price": round(predicted_price, 2),
+                "asking_price": asking_price,
+                "price_deviation": round(price_deviation, 1),
+                "approval_reasons": approval_reasons,
+                "recommendations": recommendations if recommendations else None,
+                "status": "success"
+            }
+            
+        except Exception as e:
+            logger.error(f"Error in listing approval classification: {str(e)}")
+            raise PredictionError(f"Failed to classify listing approval: {str(e)}")
 
 
 # Global model instance - will be initialized on first use
